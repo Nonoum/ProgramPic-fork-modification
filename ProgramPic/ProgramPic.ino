@@ -16,12 +16,16 @@
 */
 #define __PROG_TYPES_COMPAT__
 #include <avr/pgmspace.h> // For PROGMEM
+
 // Pin mappings for the PIC programming shield.
 #define PIN_MCLR A1 // 0: MCLR is VPP voltage, 1: Reset PIC
 #define PIN_ACTIVITY A5 // LED that indicates read/write activity
 #define PIN_VDD 2 // Controls the power to the PIC
 #define PIN_CLOCK 4 // Clock pin
 #define PIN_DATA 7 // Data pin
+
+#define PIN_PWR_PWM 9 // 62.5hKz pwm output - use 50% duty
+
 #define MCLR_RESET HIGH // PIN_MCLR state to reset the PIC
 #define MCLR_VPP LOW // PIN_MCLR state to apply 13v to MCLR/VPP pin
 // All delays are in microseconds.
@@ -74,6 +78,15 @@ unsigned long reservedEnd = 0x07FF;
 unsigned int configSave = 0x0000;
 byte progFlashType = FLASH4;
 byte dataFlashType = EEPROM;
+
+// added for newer Arduino IDE - tested with version 1.8.15
+using prog_char = char;
+using prog_uint8_t = uint8_t;
+using prog_int16_t = int16_t;
+using prog_uint16_t = uint16_t;
+using prog_uint32_t = uint32_t;
+//
+
 // Device names, forced out into PROGMEM.
 const char s_pic12f629[] PROGMEM = "pic12f629";
 const char s_pic12f675[] PROGMEM = "pic12f675";
@@ -158,6 +171,12 @@ pinMode(PIN_DATA, INPUT);
 // Turn off the activity LED initially.
 pinMode(PIN_ACTIVITY, OUTPUT);
 digitalWrite(PIN_ACTIVITY, LOW);
+
+    //------- PWM extension --------
+    pinMode(PIN_PWR_PWM, OUTPUT);
+    // Pins D9 and D10 - 62.5 kHz
+    TCCR1A = 0b00000001; // 8bit
+    TCCR1B = 0b00001001; // x1 fast pwm
 }
 void loop()
 {
@@ -997,6 +1016,7 @@ if (state != STATE_IDLE)
 return;
 // Lower MCLR, VDD, DATA, and CLOCK initially. This will put the
 // PIC into the powered-off, reset state just in case.
+    analogWrite(PIN_PWR_PWM, 0); delay(5);
 digitalWrite(PIN_MCLR, MCLR_RESET);
 digitalWrite(PIN_VDD, LOW);
 digitalWrite(PIN_DATA, LOW);
@@ -1007,6 +1027,7 @@ delayMicroseconds(DELAY_SETTLE);
 pinMode(PIN_DATA, OUTPUT);
 pinMode(PIN_CLOCK, OUTPUT);
 // Raise MCLR, then VDD.
+    analogWrite(PIN_PWR_PWM, 128); delay(5);
 digitalWrite(PIN_MCLR, MCLR_VPP);
 delayMicroseconds(DELAY_TPPDP);
 digitalWrite(PIN_VDD, HIGH);
@@ -1022,6 +1043,7 @@ void exitProgramMode()
 if (state == STATE_IDLE)
 return;
 // Lower MCLR, VDD, DATA, and CLOCK.
+    analogWrite(PIN_PWR_PWM, 0); delay(5);
 digitalWrite(PIN_MCLR, MCLR_RESET);
 digitalWrite(PIN_VDD, LOW);
 digitalWrite(PIN_DATA, LOW);
